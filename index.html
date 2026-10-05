@@ -60,16 +60,36 @@ async function open(pw) {
     text[n] = new TextDecoder().decode(await dec(key, f.iv, raw, n)); bar.value = ++done;
   }
   const swap = (html) => Object.keys(urls).sort((a, b) => b.length - a.length).reduce((h, n) => h.split(n).join(urls[n]), html);
-  const SUBS = ["network.html", "overview-sheet.html", "papers.html"], home = location.href.split("#")[0];
-  for (const sub of SUBS) if (text[sub]) urls[sub] = URL.createObjectURL(new Blob([swap(text[sub]).split('href="./"').join(`href="${home}"`)], { type: "text/html" }));
-  let main = swap(text["index.html"]);
-  for (const sub of SUBS) if (urls[sub]) main = main.split(`href="${sub}`).join(`href="${urls[sub]}`).split(`src="${sub}`).join(`src="${urls[sub]}`);
-  // downloads keep their real file names
+  // One page, many views: decrypted pages are written into this document in place, so the blob URLs created here
+  // stay valid. Routes live in the hash: #papers, #analysis-17, #network, #overview, #home; any other hash is an
+  // anchor inside the current view.
+  const fix = (h) => h
+    .split('src="network.html').join(`src="${urls["network.html"] || ""}`)
+    .split('href="papers.html"').join('href="#papers"')
+    .split('href="network.html"').join('href="#network"')
+    .split('href="overview-sheet.html"').join('href="#overview"')
+    .split('href="analysis.html#').join('href="#analysis-')
+    .split('href="./"').join('href="#home"');
+  if (text["network.html"]) urls["network.html"] = URL.createObjectURL(new Blob([swap(text["network.html"])], { type: "text/html" }));
+  const VIEWS = { home: "index.html", papers: "papers.html", network: "network.html", overview: "overview-sheet.html", analysis: "analysis.html" };
+  const pages = {};
+  for (const [k, f] of Object.entries(VIEWS)) if (text[f]) pages[k] = fix(swap(text[f])).replace("</body>", "<script>window.__site && window.__site.wire()<\/script></body>");
+  let main = pages.home;
   main = main.replace(/<a href="(blob:[^"]+)"><b>/g, (s, u) => {
     const n = Object.keys(urls).find((k) => urls[k] === u); return n && !n.endsWith(".html") ? `<a href="${u}" download="${n.split("/").pop()}"><b>` : s;
   });
+  pages.home = main;
+  const viewOf = (h) => (h === "papers" ? "papers" : h === "network" ? "network" : h === "overview" ? "overview" : h.startsWith("analysis-") ? "analysis" : "home");
+  const site = (window.__site = { current: null, pages,
+    route() {
+      const h = decodeURIComponent(location.hash.slice(1)), v = viewOf(h);
+      if (v === site.current) return;
+      site.current = v; document.open(); document.write(site.pages[v]); document.close();
+      if (v === "home" && h && h !== "home") setTimeout(() => document.getElementById(h)?.scrollIntoView(), 50); else window.scrollTo(0, 0);
+    },
+    wire() { window.removeEventListener("hashchange", site.route); window.addEventListener("hashchange", site.route); } });
   try { sessionStorage.setItem("pw", pw); } catch {}
-  document.open(); document.write(main); document.close();
+  site.route();
 }
 $("f").addEventListener("submit", async (e) => {
   e.preventDefault(); $("go").disabled = true; $("msg").className = ""; $("msg").textContent = "Decrypting...";
