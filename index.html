@@ -68,10 +68,12 @@ async function open(pw) {
     .split('href="papers.html"').join('href="#papers"')
     .split('href="network.html"').join('href="#network"')
     .split('href="overview-sheet.html"').join('href="#overview"')
+    .split('href="propositions.html#open"').join('href="#propositions"')
+    .split('href="propositions.html"').join('href="#propositions"')
     .split('href="analysis.html#').join('href="#analysis-')
     .split('href="./"').join('href="#home"');
   if (text["network.html"]) urls["network.html"] = URL.createObjectURL(new Blob([swap(text["network.html"])], { type: "text/html" }));
-  const VIEWS = { home: "index.html", papers: "papers.html", network: "network.html", overview: "overview-sheet.html", analysis: "analysis.html" };
+  const VIEWS = { home: "index.html", papers: "papers.html", network: "network.html", overview: "overview-sheet.html", analysis: "analysis.html", propositions: "propositions.html" };
   const pages = {};
   for (const [k, f] of Object.entries(VIEWS)) if (text[f]) pages[k] = fix(swap(text[f])).replace("</body>", "<script>window.__site && window.__site.wire()<\/script></body>");
   let main = pages.home;
@@ -79,13 +81,16 @@ async function open(pw) {
     const n = Object.keys(urls).find((k) => urls[k] === u); return n && !n.endsWith(".html") ? `<a href="${u}" download="${n.split("/").pop()}"><b>` : s;
   });
   pages.home = main;
-  const viewOf = (h) => (h === "papers" ? "papers" : h === "network" ? "network" : h === "overview" ? "overview" : h.startsWith("analysis-") ? "analysis" : "home");
+  // a route name switches views; any other hash is an anchor inside the current view
+  // each history entry remembers its view, so Back to an anchor returns to the view that held it
+  const viewOf = (h) => (["papers", "network", "overview", "propositions", "home"].includes(h) ? h : h.startsWith("analysis-") ? "analysis" : (history.state && history.state.view) || (window.__site && window.__site.current) || "home");
   const site = (window.__site = { current: null, pages,
     route() {
       const h = decodeURIComponent(location.hash.slice(1)), v = viewOf(h);
+      try { if (!history.state || history.state.view !== v) history.replaceState({ view: v }, ""); } catch {}
       if (v === site.current) return;
       site.current = v; document.open(); document.write(site.pages[v]); document.close();
-      if (v === "home" && h && h !== "home") setTimeout(() => document.getElementById(h)?.scrollIntoView(), 50); else window.scrollTo(0, 0);
+      if (h && !VIEWS[h] && !h.startsWith("analysis-")) setTimeout(() => document.getElementById(h)?.scrollIntoView(), 50); else window.scrollTo(0, 0);
     },
     wire() { window.removeEventListener("hashchange", site.route); window.addEventListener("hashchange", site.route); } });
   try { sessionStorage.setItem("pw", pw); } catch {}
