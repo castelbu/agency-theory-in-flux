@@ -60,9 +60,10 @@ async function open(pw) {
     text[n] = new TextDecoder().decode(await dec(key, f.iv, raw, n)); bar.value = ++done;
   }
   const swap = (html) => Object.keys(urls).sort((a, b) => b.length - a.length).reduce((h, n) => h.split(n).join(urls[n]), html);
-  for (const sub of ["network.html", "overview-sheet.html"]) if (text[sub]) urls[sub] = URL.createObjectURL(new Blob([swap(text[sub])], { type: "text/html" }));
+  const SUBS = ["network.html", "overview-sheet.html", "papers.html"], home = location.href.split("#")[0];
+  for (const sub of SUBS) if (text[sub]) urls[sub] = URL.createObjectURL(new Blob([swap(text[sub]).split('href="./"').join(`href="${home}"`)], { type: "text/html" }));
   let main = swap(text["index.html"]);
-  for (const sub of ["network.html", "overview-sheet.html"]) main = main.split(sub).join(urls[sub]);
+  for (const sub of SUBS) if (urls[sub]) main = main.split(`href="${sub}`).join(`href="${urls[sub]}`).split(`src="${sub}`).join(`src="${urls[sub]}`);
   // downloads keep their real file names
   main = main.replace(/<a href="(blob:[^"]+)"><b>/g, (s, u) => {
     const n = Object.keys(urls).find((k) => urls[k] === u); return n && !n.endsWith(".html") ? `<a href="${u}" download="${n.split("/").pop()}"><b>` : s;
