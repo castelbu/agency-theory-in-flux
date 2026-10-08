@@ -74,6 +74,8 @@ async function open(pw) {
     .split('href="./"').join('href="#home"');
   if (text["network.html"]) urls["network.html"] = URL.createObjectURL(new Blob([swap(text["network.html"])], { type: "text/html" }));
   const VIEWS = { home: "index.html", papers: "papers.html", network: "network.html", overview: "overview-sheet.html", analysis: "analysis.html", propositions: "propositions.html" };
+  // review pages are reached only by their route (#review-41); they are not linked from the site's nav
+  for (const n of Object.keys(text)) { const r = n.match(/^review-([\w-]+)\.html$/); if (r) VIEWS["review-" + r[1]] = n; }
   const pages = {};
   for (const [k, f] of Object.entries(VIEWS)) if (text[f]) pages[k] = fix(swap(text[f])).replace("</body>", "<script>window.__site && window.__site.wire()<\/script></body>");
   let main = pages.home;
@@ -83,7 +85,7 @@ async function open(pw) {
   pages.home = main;
   // a route name switches views; any other hash is an anchor inside the current view
   // each history entry remembers its view, so Back to an anchor returns to the view that held it
-  const viewOf = (h) => (["papers", "network", "overview", "propositions", "home"].includes(h) ? h : h.startsWith("analysis-") ? "analysis" : (history.state && history.state.view) || (window.__site && window.__site.current) || "home");
+  const viewOf = (h) => (["papers", "network", "overview", "propositions", "home"].includes(h) || (h.startsWith("review-") && VIEWS[h]) ? h : h.startsWith("analysis-") ? "analysis" : (history.state && history.state.view) || (window.__site && window.__site.current) || "home");
   const site = (window.__site = { current: null, pages,
     route() {
       const h = decodeURIComponent(location.hash.slice(1)), v = viewOf(h);
